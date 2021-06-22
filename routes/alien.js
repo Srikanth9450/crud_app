@@ -5,12 +5,16 @@ const router = express.Router()
 const jwt = require("jsonwebtoken")
 const Alien = require("../database/model")
 const bcrypt = require("bcrypt")
+const { removeAllListeners } = require("../database/model");
+const { body, check, validationResult } = require('express-validator');
+const bodyParser = require("body-parser");
+const { default: validator } = require("validator");
 var refreshTokens = []
 ACCESS_TOKEN = "a9caa30e09a3580f925acdd5ab6dd0f1bf7812a4732f4dcf6b47d40970f85e43c3e9e398cd5233b34f5fab93a2e581fadd9d6c49f38ebf47cc9d2240d7d27aa5"
 
 REFRESH_TOKEN = "cc1ffb5f65cca46ef6f893a33837fcf8bc75f7966bd38ede501315420b43e150c26f7967ce7ec01d1e76f603a0d771af3a8fc10da5279cbe02cefad373b2143d"
 FORGET_PASS = "useremailforget123"
-
+var urlencodedParser = bodyParser.urlencoded({ extended: false })
 router.delete("/logout", (req, res) => {
         refreshTokens = refreshTokens.filter(token => token !== REFRESH_TOKEN)
         res.sendStatus(204)
@@ -201,23 +205,51 @@ router.put('/reset', async(req, res) => {
 
 
 })
+var jsonParser = bodyParser.json()
 
-router.post("/register", (req, res) => {
-    const name = req.body.name
-    const age = req.body.age
-    const email = req.body.email
-    const password = req.body.password
-    alien = new Alien({
-        name: name,
-        age: age,
-        email: email,
-        password: password
-    })
+router.post("/register", urlencodedParser, [
+    check("email", "enter valid email id").isEmail().normalizeEmail(),
+    check("password", "password must have graterthan 5 charecters and lessthan").isLength({ min: 5, max: 20 }).contains(),
+    check("password", "enter atleast one number").matches(/\d/),
+    check("password", "enter atleast one symbol other than _ ").matches(/\W/),
 
 
-    alien.save()
-    res.json(alien)
+], (req, res) => {
+    var valid = false;
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+        res.status(422).jsonp(errors.array());
+    } else {
+
+        Alien.findOne({ email: req.body.email }).then((user) => {
+                res.json("email already exist")
+            })
+            .catch((err) => {
+                valid = true
+            })
+        if (valid) {
+
+
+            const name = req.body.name
+            const age = req.body.age
+            const email = req.body.email
+            const password = req.body.password
+            alien = new Alien({
+                name: name,
+                age: age,
+                email: email,
+                password: password
+            })
+
+
+            alien.save()
+            res.json(alien)
+        }
+
+    }
 
 })
+
+
 
 module.exports = router
